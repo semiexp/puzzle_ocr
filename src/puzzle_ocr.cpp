@@ -16,7 +16,10 @@ void PuzzleOCR::Load(const char *file)
 
 void PuzzleOCR::Show()
 {
-	cv::imshow("View", image_);
+	cv::Mat tmp;
+	cv::resize(image_, tmp, cv::Size(), 1, 1);
+	cv::imshow("View", tmp);
+
 	cv::waitKey();
 }
 
@@ -116,6 +119,9 @@ void PuzzleOCR::ComputeGridGraph()
 	}
 
 	std::vector<bool> vis(components_.size(), false);
+	std::vector<int> next_ids(components_.size(), -1);
+	int next_id_last = 0;
+
 	for (int i = 0; i < components_.size(); ++i) {
 		if (vis[i]) continue;
 
@@ -139,14 +145,36 @@ void PuzzleOCR::ComputeGridGraph()
 		}
 
 		if (cur.size() > 16) {
-			printf("%d\n", cur.size());
 			for (int p : cur) {
-				auto qr = components_[p];
-				cv::line(image_, cv::Point(qr.ul.x, qr.ul.y), cv::Point(qr.ur.x, qr.ur.y), 127, 2);
-				cv::line(image_, cv::Point(qr.dl.x, qr.dl.y), cv::Point(qr.dr.x, qr.dr.y), 127, 2);
-				cv::line(image_, cv::Point(qr.ul.x, qr.ul.y), cv::Point(qr.dl.x, qr.dl.y), 127, 2);
-				cv::line(image_, cv::Point(qr.ur.x, qr.ur.y), cv::Point(qr.dr.x, qr.dr.y), 127, 2);
+				next_ids[p] = next_id_last++;
 			}
 		}
+	}
+
+	std::vector<Quadrilateral> components_new(next_id_last);
+	std::vector<GridCell> cells_new(next_id_last);
+
+	for (int i = 0; i < components_.size(); ++i) {
+		if (next_ids[i] != -1) {
+			int ni = next_ids[i];
+
+			components_new[ni] = components_[i];
+			cells_new[ni] = cells_[i];
+
+			if (cells_new[ni].up != -1) cells_new[ni].up = next_ids[cells_new[ni].up];
+			if (cells_new[ni].left != -1) cells_new[ni].left = next_ids[cells_new[ni].left];
+			if (cells_new[ni].right != -1) cells_new[ni].right = next_ids[cells_new[ni].right];
+			if (cells_new[ni].down != -1) cells_new[ni].down = next_ids[cells_new[ni].down];
+		}
+	}
+
+	std::swap(components_, components_new);
+	std::swap(cells_, cells_new);
+
+	for (auto qr : components_) {
+		cv::line(image_, cv::Point(qr.ul.x, qr.ul.y), cv::Point(qr.ur.x, qr.ur.y), 127, 2);
+		cv::line(image_, cv::Point(qr.dl.x, qr.dl.y), cv::Point(qr.dr.x, qr.dr.y), 127, 2);
+		cv::line(image_, cv::Point(qr.ul.x, qr.ul.y), cv::Point(qr.dl.x, qr.dl.y), 127, 2);
+		cv::line(image_, cv::Point(qr.ur.x, qr.ur.y), cv::Point(qr.dr.x, qr.dr.y), 127, 2);
 	}
 }
