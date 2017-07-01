@@ -42,6 +42,7 @@ void PuzzleOCR::ComputeConnectedComponents()
 	int height = image_.rows, width = image_.cols;
 
 	std::vector<std::vector<bool> > visited(height, std::vector<bool>(width, false));
+	components_.clear();
 
 	for (int y = 0; y < height; ++y) {
 		for (int x = 0; x < width; ++x) {
