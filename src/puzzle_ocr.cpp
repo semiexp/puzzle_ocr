@@ -253,11 +253,96 @@ void PuzzleOCR::ComputeGridGraph()
 
 	std::swap(components_, components_new);
 	std::swap(cells_, cells_new);
-
 	for (auto qr : components_) {
 		cv::line(image_, cv::Point(qr.ul.x, qr.ul.y), cv::Point(qr.ur.x, qr.ur.y), 127, 2);
 		cv::line(image_, cv::Point(qr.dl.x, qr.dl.y), cv::Point(qr.dr.x, qr.dr.y), 127, 2);
 		cv::line(image_, cv::Point(qr.ul.x, qr.ul.y), cv::Point(qr.dl.x, qr.dl.y), 127, 2);
 		cv::line(image_, cv::Point(qr.ur.x, qr.ur.y), cv::Point(qr.dr.x, qr.dr.y), 127, 2);
 	}
+}
+
+std::vector<std::vector<std::vector<cv::Mat> > > PuzzleOCR::ExtractFields()
+{
+	// TODO: reorder fields properly
+	std::vector<std::vector<std::vector<cv::Mat> > > ret;
+
+	const int kUnvisited = 0x7fffffff;
+	std::vector<int> grid_y(components_.size(), kUnvisited), grid_x(components_.size(), kUnvisited);
+	for (int i = 0; i < components_.size(); ++i) {
+		if (grid_y[i] != kUnvisited) continue;
+
+		std::queue<int> qu;
+		grid_y[i] = grid_x[i] = 0;
+		qu.push(i);
+
+		std::vector<int> unit_cells;
+		while (!qu.empty()) {
+			int u = qu.front(); qu.pop();
+			unit_cells.push_back(u);
+			{
+				int v = cells_[u].up;
+				if (v != -1 && grid_y[v] == kUnvisited) {
+					grid_y[v] = grid_y[u] - 1;
+					grid_x[v] = grid_x[u];
+					qu.push(v);
+				}
+			}
+			{
+				int v = cells_[u].left;
+				if (v != -1 && grid_y[v] == kUnvisited) {
+					grid_y[v] = grid_y[u];
+					grid_x[v] = grid_x[u] - 1;
+					qu.push(v);
+				}
+			}
+			{
+				int v = cells_[u].right;
+				if (v != -1 && grid_y[v] == kUnvisited) {
+					grid_y[v] = grid_y[u];
+					grid_x[v] = grid_x[u] + 1;
+					qu.push(v);
+				}
+			}
+			{
+				int v = cells_[u].down;
+				if (v != -1 && grid_y[v] == kUnvisited) {
+					grid_y[v] = grid_y[u] + 1;
+					grid_x[v] = grid_x[u];
+					qu.push(v);
+				}
+			}
+		}
+
+		int y_min = 0, x_min = 0, y_max = 0, x_max = 0;
+		for (auto p : unit_cells) {
+			y_min = std::min(y_min, grid_y[p]);
+			x_min = std::min(x_min, grid_x[p]);
+			y_max = std::max(y_max, grid_y[p]);
+			x_max = std::max(x_max, grid_x[p]);
+		}
+
+		std::vector<std::vector<cv::Mat> > field(y_max - y_min + 1, std::vector<cv::Mat>(x_max - x_min + 1));
+		for (auto p : unit_cells) {
+			int y = grid_y[p] - y_min, x = grid_x[p] - x_min;
+			field[y][x] = ExtractCellImage(components_[p]);
+		}
+		ret.push_back(field);
+	}
+
+	return ret;
+}
+
+cv::Mat PuzzleOCR::ExtractCellImage(Quadrilateral qu)
+{
+	const int kImageSize = 32;
+
+	cv::Mat ret(kImageSize, kImageSize, CV_8UC1);
+	for (int y = 0; y < kImageSize; ++y) {
+		for (int x = 0; x < kImageSize; ++x) {
+			double ry = (y + 0.5) / kImageSize, rx = (x + 0.5) / kImageSize;
+			Point pt = qu.ul * ((1 - ry) * (1 - rx)) + qu.ur * ((1 - ry) * rx) + qu.dl * (ry * (1 - rx)) + qu.dr * (ry * rx);
+			ret.at<uchar>(y, x) = image_.at<uchar>((int)pt.y, (int)pt.x);
+		}
+	}
+	return ret;
 }

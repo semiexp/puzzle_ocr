@@ -12,6 +12,20 @@ int main(int argc, char** argv)
 	ocr.RobustifyConnectivity();
 	ocr.ComputeConnectedComponents();
 	ocr.ComputeGridGraph();
+
+	auto info = ocr.ExtractFields();
+	for (int i = 0; i < info.size(); ++i) {
+		auto f = info[i];
+		for (int y = 0; y < f.size(); ++y) {
+			for (int x = 0; x < f[0].size(); ++x) {
+				if (f[y][x].rows == 0) printf("#");
+				else printf(".");
+			}
+			puts("");
+		}
+		puts("---------------------------------");
+	}
+
 	ocr.Show();
 
 	return 0;

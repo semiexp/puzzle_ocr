@@ -18,6 +18,7 @@ public:
 	void RobustifyConnectivity();
 	void ComputeConnectedComponents();
 	void ComputeGridGraph();
+	std::vector<std::vector<std::vector<cv::Mat> > > ExtractFields();
 
 private:
 	struct GridCell
@@ -27,9 +28,10 @@ private:
 		GridCell() : up(-1), left(-1), right(-1), down(-1) {}
 	};
 
+	cv::Mat ExtractCellImage(Quadrilateral qr);
+
 	cv::Mat image_;
 	std::vector<std::vector<bool> > data_;
 	std::vector<Quadrilateral> components_;
 	std::vector<GridCell> cells_;
-
 };
