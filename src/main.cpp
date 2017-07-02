@@ -9,6 +9,7 @@ int main(int argc, char** argv)
 	PuzzleOCR ocr;
 	ocr.Load(argv[1]);
 	ocr.ExtractData();
+	ocr.RobustifyConnectivity();
 	ocr.ComputeConnectedComponents();
 	ocr.ComputeGridGraph();
 	ocr.Show();

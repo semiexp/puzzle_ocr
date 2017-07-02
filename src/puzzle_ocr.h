@@ -15,6 +15,7 @@ public:
 	void Show();
 
 	void ExtractData();
+	void RobustifyConnectivity();
 	void ComputeConnectedComponents();
 	void ComputeGridGraph();
 

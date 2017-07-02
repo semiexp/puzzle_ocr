@@ -16,4 +16,9 @@ double Distance(const Point &a, const Point &b)
 {
 	return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
 }
+double Angle(const Point &o, const Point &a, const Point &b)
+{
+	double oa = Distance(o, a), ob = Distance(o, b), ab = Distance(a, b);
+	return acos((oa * oa + ob * ob - ab * ab) / (2 * oa * ob));
+}
 }
