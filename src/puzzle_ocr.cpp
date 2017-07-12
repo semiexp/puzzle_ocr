@@ -3,6 +3,8 @@
 #include <vector>
 #include <algorithm>
 #include <queue>
+#include <thread>
+#include <mutex>
 
 #include "point.h"
 #include "quadrilateral.h"
@@ -37,84 +39,111 @@ void PuzzleOCR::ExtractData()
 
 void PuzzleOCR::RobustifyConnectivity()
 {
-	const int neighbor_size = 9;
 	const int dy[] = { -1, 0, 1, 0 }, dx[] = { 0, -1, 0, 1 };
 	const double PI = acos(-1);
-
 	int height = image_.rows, width = image_.cols;
-	int is_connected[2 * neighbor_size + 1][2 * neighbor_size + 1];
 
-	for (int y = 0; y < height; ++y) {
-		for (int x = 0; x < width; ++x) {
-			if (!data_[y][x]) continue;
+	auto CheckPixel = [&](int y, int x) {
+		const int neighbor_size = 9;
+		int is_connected[2 * neighbor_size + 1][2 * neighbor_size + 1];
 
-			int dy_min = std::max(-y, -neighbor_size);
-			int dy_max = std::min(neighbor_size, height - y - 1);
-			int dx_min = std::max(-x, -neighbor_size);
-			int dx_max = std::min(neighbor_size, width - x - 1);
+		if (!data_[y][x]) return;
 
-			for (int dy = dy_min; dy <= dy_max; ++dy) {
-				for (int dx = dx_min; dx <= dx_max; ++dx) {
-					is_connected[dy + neighbor_size][dx + neighbor_size] = data_[y + dy][x + dx] ? 1 : 0;
-				}
+		int dy_min = std::max(-y, -neighbor_size);
+		int dy_max = std::min(neighbor_size, height - y - 1);
+		int dx_min = std::max(-x, -neighbor_size);
+		int dx_max = std::min(neighbor_size, width - x - 1);
+
+		for (int dy = dy_min; dy <= dy_max; ++dy) {
+			for (int dx = dx_min; dx <= dx_max; ++dx) {
+				is_connected[dy + neighbor_size][dx + neighbor_size] = data_[y + dy][x + dx] ? 1 : 0;
 			}
+		}
 
-			std::queue<std::pair<int, int> > Q;
-			Q.push({ 0, 0 });
-			is_connected[neighbor_size][neighbor_size] = 2;
+		std::queue<std::pair<int, int> > Q;
+		Q.push({ 0, 0 });
+		is_connected[neighbor_size][neighbor_size] = 2;
 
-			while (!Q.empty()) {
-				auto p = Q.front(); Q.pop();
-				for (int d = 0; d < 4; ++d) {
-					int dy2 = p.first + dy[d], dx2 = p.second + dx[d];
-					if (-neighbor_size <= dy2 && dy2 <= neighbor_size && -neighbor_size <= dx2 && dx2 <= neighbor_size && is_connected[dy2 + neighbor_size][dx2 + neighbor_size] == 1) {
-						is_connected[dy2 + neighbor_size][dx2 + neighbor_size] = 2;
-						Q.push({ dy2, dx2 });
-					}
-				}
-			}
-
-			int dy_min2 = std::max(dy_min, -(neighbor_size / 2));
-			int dy_max2 = std::min(dy_max, neighbor_size / 2);
-			int dx_min2 = std::max(dx_min, -(neighbor_size / 2));
-			int dx_max2 = std::min(dx_max, neighbor_size / 2);
-
-			int outsider_dy = neighbor_size, outsider_dx = 0;
-			for (int dy = dy_min2; dy <= dy_max2; ++dy) {
-				for (int dx = dx_min2; dx <= dx_max2; ++dx) {
-					if (is_connected[dy + neighbor_size][dx + neighbor_size] == 1) {
-						if (outsider_dy * outsider_dy + outsider_dx * outsider_dx > dy * dy + dx * dx) {
-							outsider_dy = dy;
-							outsider_dx = dx;
-						}
-					}
-				}
-			}
-
-			if (outsider_dy == neighbor_size) continue;
-
-			double average_angle = 0;
-			int n_units = 0;
-			for (int dy = dy_min; dy <= dy_max; ++dy) {
-				for (int dx = dx_min; dx <= dx_max; ++dx) {
-					if (is_connected[dy + neighbor_size][dx + neighbor_size] == 2 && (dy != 0 || dx != 0)) {
-						++n_units;
-						average_angle += geom::Angle(Point(0, 0), Point(dx, dy), Point(outsider_dx, outsider_dy));
-					}
-				}
-			}
-
-			if (n_units < 10) continue;
-			average_angle /= n_units;
-			if (average_angle > PI * 0.75) {
-				int len = std::max(abs(outsider_dx), abs(outsider_dy));
-				for (int d = 0; d <= len; ++d) {
-					data_[y + outsider_dy * d / len][x + outsider_dx * d / len] = true;
-					image_.at<uchar>(y + outsider_dy * d / len, x + outsider_dx * d / len) = 0;
+		while (!Q.empty()) {
+			auto p = Q.front(); Q.pop();
+			for (int d = 0; d < 4; ++d) {
+				int dy2 = p.first + dy[d], dx2 = p.second + dx[d];
+				if (-neighbor_size <= dy2 && dy2 <= neighbor_size && -neighbor_size <= dx2 && dx2 <= neighbor_size && is_connected[dy2 + neighbor_size][dx2 + neighbor_size] == 1) {
+					is_connected[dy2 + neighbor_size][dx2 + neighbor_size] = 2;
+					Q.push({ dy2, dx2 });
 				}
 			}
 		}
+
+		int dy_min2 = std::max(dy_min, -(neighbor_size / 2));
+		int dy_max2 = std::min(dy_max, neighbor_size / 2);
+		int dx_min2 = std::max(dx_min, -(neighbor_size / 2));
+		int dx_max2 = std::min(dx_max, neighbor_size / 2);
+
+		int outsider_dy = neighbor_size, outsider_dx = 0;
+		for (int dy = dy_min2; dy <= dy_max2; ++dy) {
+			for (int dx = dx_min2; dx <= dx_max2; ++dx) {
+				if (is_connected[dy + neighbor_size][dx + neighbor_size] == 1) {
+					if (outsider_dy * outsider_dy + outsider_dx * outsider_dx > dy * dy + dx * dx) {
+						outsider_dy = dy;
+						outsider_dx = dx;
+					}
+				}
+			}
+		}
+
+		if (outsider_dy == neighbor_size) return;
+
+		double average_angle = 0;
+		int n_units = 0;
+		for (int dy = dy_min; dy <= dy_max; ++dy) {
+			for (int dx = dx_min; dx <= dx_max; ++dx) {
+				if (is_connected[dy + neighbor_size][dx + neighbor_size] == 2 && (dy != 0 || dx != 0)) {
+					++n_units;
+					average_angle += geom::Angle(Point(0, 0), Point(dx, dy), Point(outsider_dx, outsider_dy));
+				}
+			}
+		}
+
+		if (n_units < 10) return;
+		average_angle /= n_units;
+		if (average_angle > PI * 0.75) {
+			int len = std::max(abs(outsider_dx), abs(outsider_dy));
+			for (int d = 0; d <= len; ++d) {
+				data_[y + outsider_dy * d / len][x + outsider_dx * d / len] = true;
+				image_.at<uchar>(y + outsider_dy * d / len, x + outsider_dx * d / len) = 0;
+			}
+		}
+	};
+
+	const int unit = 1000;
+	int pos = 0;
+	std::mutex mtx;
+
+	auto worker = [&](int id) {
+		int start, end;
+
+		for (;;) {
+			mtx.lock();
+			start = pos;
+			pos += unit;
+			mtx.unlock();
+
+			if (start >= height * width) break;
+			end = std::min(start + unit, height * width);
+
+			for (int c = start; c < end; ++c) {
+				int y = c / width, x = c % width;
+				CheckPixel(y, x);
+			}
+		}
+	};
+
+	std::vector<std::thread> threads;
+	for (int i = 0; i < 10; ++i) {
+		threads.push_back(std::thread(worker, i));
 	}
+	for (auto& t : threads) t.join();
 }
 
 void PuzzleOCR::ComputeConnectedComponents()
