@@ -293,7 +293,8 @@ void PuzzleOCR::ComputeGridGraph()
 std::vector<std::vector<std::vector<cv::Mat> > > PuzzleOCR::ExtractFields()
 {
 	// TODO: reorder fields properly
-	std::vector<std::vector<std::vector<cv::Mat> > > ret;
+	std::vector<std::vector<std::vector<cv::Mat> > > ret_unordered;
+	std::vector<double> field_x, field_y_top, field_y_bottom;
 
 	const int kUnvisited = 0x7fffffff;
 	std::vector<int> grid_y(components_.size(), kUnvisited), grid_x(components_.size(), kUnvisited);
@@ -355,7 +356,50 @@ std::vector<std::vector<std::vector<cv::Mat> > > PuzzleOCR::ExtractFields()
 			int y = grid_y[p] - y_min, x = grid_x[p] - x_min;
 			field[y][x] = ExtractCellImage(components_[p]);
 		}
-		ret.push_back(field);
+		ret_unordered.push_back(field);
+
+		double px_y_min = 1e9, px_y_max = -1, px_x_min = 1e9, px_x_max = -1;
+		auto update = [&](Point pt) {
+			px_y_min = std::min(px_y_min, pt.y);
+			px_y_max = std::max(px_y_max, pt.y);
+			px_x_min = std::min(px_x_min, pt.x);
+			px_x_max = std::max(px_x_max, pt.x);
+		};
+		for (auto p : unit_cells) {
+			update(components_[p].ul);
+			update(components_[p].ur);
+			update(components_[p].dl);
+			update(components_[p].dr);
+		}
+
+		field_x.push_back((px_x_min + px_x_max) / 2);
+		field_y_top.push_back(px_y_min * 0.75 + px_y_max * 0.25);
+		field_y_bottom.push_back(px_y_min * 0.25 + px_y_max * 0.75);
+	}
+
+	// Reorder fields
+	std::vector<std::vector<std::vector<cv::Mat> > > ret;
+	std::vector<bool> used(ret_unordered.size(), false);
+
+	for (;;) {
+		int lowest_unused = -1;
+		for (int i = 0; i < ret_unordered.size(); ++i) {
+			if (!used[i] && (lowest_unused == -1 || field_y_top[lowest_unused] > field_y_top[i])) {
+				lowest_unused = i;
+			}
+		}
+		if (lowest_unused == -1) break;
+		std::vector<std::pair<double, int> > same_row;
+		for (int i = 0; i < ret_unordered.size(); ++i) {
+			if (!used[i] && !(field_y_bottom[i] < field_y_top[lowest_unused] || field_y_bottom[lowest_unused] < field_y_top[i])) {
+				same_row.push_back({field_x[i], i});
+				used[i] = true;
+			}
+		}
+		std::sort(same_row.begin(), same_row.end());
+		for (int i = 0; i < same_row.size(); ++i) {
+			ret.push_back(ret_unordered[same_row[i].second]);
+		}
 	}
 
 	return ret;
