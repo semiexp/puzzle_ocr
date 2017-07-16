@@ -13,6 +13,7 @@ public:
 	void Save(const char *file);
 	void Load(const char *file);
 	int Recognize(const cv::Mat &img);
+	std::vector<std::vector<int> > RecognizeAll(const std::vector<std::vector<cv::Mat> > &field);
 	std::vector<std::vector<bool> > ExtractLargestComponent(std::vector<std::vector<bool> > data);
 
 private:

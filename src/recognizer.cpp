@@ -78,6 +78,22 @@ int Recognizer::Recognize(const cv::Mat &img)
 
 	return svm_->predict(img_mat);
 }
+std::vector<std::vector<int> > Recognizer::RecognizeAll(const std::vector<std::vector<cv::Mat> > &field)
+{
+	std::vector<std::vector<int> > ret;
+	for (int i = 0; i < field.size(); ++i) {
+		std::vector<int> row;
+		for (int j = 0; j < field[i].size(); ++j) {
+			if (field[i][j].rows > 0) {
+				row.push_back(Recognize(field[i][j]));
+			} else {
+				row.push_back(-1);
+			}
+		}
+		ret.push_back(row);
+	}
+	return ret;
+}
 namespace
 {
 int FillConnectedComponent(int y, int x, const std::vector<std::vector<bool> > &data, std::vector<std::vector<int> > &sto, int c)
