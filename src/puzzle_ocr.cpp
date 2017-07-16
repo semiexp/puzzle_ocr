@@ -60,17 +60,18 @@ void PuzzleOCR::RobustifyConnectivity()
 			}
 		}
 
-		std::queue<std::pair<int, int> > Q;
-		Q.push({ 0, 0 });
+		std::pair<int, int> qu[(2 * neighbor_size + 1) * (2 * neighbor_size + 1) + 1];
+		int qtop = 0, qend = 0;
+		qu[qend++] = std::make_pair(0, 0);
 		is_connected[neighbor_size][neighbor_size] = 2;
 
-		while (!Q.empty()) {
-			auto p = Q.front(); Q.pop();
+		while (qtop != qend) {
+			auto p = qu[qtop++];
 			for (int d = 0; d < 4; ++d) {
 				int dy2 = p.first + dy[d], dx2 = p.second + dx[d];
 				if (-neighbor_size <= dy2 && dy2 <= neighbor_size && -neighbor_size <= dx2 && dx2 <= neighbor_size && is_connected[dy2 + neighbor_size][dx2 + neighbor_size] == 1) {
 					is_connected[dy2 + neighbor_size][dx2 + neighbor_size] = 2;
-					Q.push({ dy2, dx2 });
+					qu[qend++] = std::make_pair(dy2, dx2);
 				}
 			}
 		}
